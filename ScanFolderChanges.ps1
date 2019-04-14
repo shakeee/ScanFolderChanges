@@ -1,38 +1,37 @@
+$ErrorActionPreference = 'Continue'
 Set-StrictMode -Version 2.0
 
 $FileSystemWatcher = New-Object System.IO.FileSystemWatcher
-$FileSystemWatcher.Path  = "D:\backup"
-$FileSystemWatcher.EnableRaisingEvents = $false
-$FileSystemWatcher.NotifyFilter = [System.IO.NotifyFilters]::LastWrite -bor [System.IO.NotifyFilters]::filename
-$ScriptPath = ".\TestOutput.ps1"
+$FileSystemWatcher.Path  = "D:\DMT"
 
+Register-ObjectEvent -InputObject $FileSystemWatcher -EventName Created -Action {
+    $time = $Event.TimeGenerated;
+    $Result = $Event.SourceEventArgs.Name;
+    $eventType = $Event.SourceEventArgs.ChangeType;
 
-while($true){
-    $Result = $FileSystemWatcher.WaitForChanged([System.IO.WatcherChangeTypes]::Changed -bor [System.IO.WatcherChangeTypes]::Renamed -bOr [System.IO.WatcherChangeTypes]::Created, 1000);
-    if($result.TimedOut){
-        continue;
-    }
+    Write-Host "$eventType $Result at $time";
 
-    #Writes name of file that is added
-    Write-Host "Change in " + $Result.Name
-
-    $TxtFile = $Result.Name
+    $TxtFile = $Result
     $FileContent = @{}
 
     $NewName = get-date -Format 'yyyyMMddTHHmmss'
-
     #Location of folder which is being watched
-    $Contents = Get-Content "D:\backup\$TxtFile"
-
+    $Contents = Get-Content "D:\DMT\$TxtFile"
+    
     #Splitting variable and value from .txt file and adding them to hash table $FileContent
     foreach ($Line in $Contents){
         $FileContent[$Line.split('=').trim()[0]] = ($Line.split('=').trim()[1])
     }
 
-    #Start other script with forwarded parameters from .txt file
-    & $ScriptPath -Source $FileContent["source"] -Module $FileContent["module"] -Action $FileContent["action"] -Mail $FileContent["mail"]
-
     #Copying item to new destination, renaming it and removing from watched folder
-    Copy-Item -Path D:\backup\$TxtFile -Destination D:\Stuff\$NewName.txt -Force -Verbose
-    Remove-item -Path D:\backup\$TxtFile
+    Copy-Item -Path D:\DMT\$TxtFile -Destination D:\DMT\History\$NewName.txt -Force -Verbose
+    Remove-item -Path D:\DMT\$TxtFile
+
+    #Start other script with forwarded parameters from .txt file
+    & ".\RunApp.ps1" -Source $FileContent["source"] -Module $FileContent["module"] -Action $FileContent["action"] -Mail $FileContent["mail"]
+}
+
+while($true){
+   Start-Sleep -Seconds 1;
+   Write-Host "watching folder..."
 }
