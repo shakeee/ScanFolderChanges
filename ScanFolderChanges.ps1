@@ -3,8 +3,10 @@ Set-StrictMode -Version 2.0
 
 $FileSystemWatcher = New-Object System.IO.FileSystemWatcher
 $FileSystemWatcher.Path  = "D:\DMT"
+$FileSystemWatcher.EnableRaisingEvents = $true
 
-Register-ObjectEvent -InputObject $FileSystemWatcher -EventName Created -Action {
+Get-EventSubscriber -Force | Where-Object{$_.EventName -ieq 'Created'} | Unregister-Event -Force
+$job = Register-ObjectEvent -InputObject $FileSystemWatcher -EventName Created -Action {
     $time = $Event.TimeGenerated;
     $Result = $Event.SourceEventArgs.Name;
     $eventType = $Event.SourceEventArgs.ChangeType;
@@ -28,10 +30,11 @@ Register-ObjectEvent -InputObject $FileSystemWatcher -EventName Created -Action 
     Remove-item -Path D:\DMT\$TxtFile
 
     #Start other script with forwarded parameters from .txt file
-    & ".\RunApp.ps1" -Source $FileContent["source"] -Module $FileContent["module"] -Action $FileContent["action"] -Mail $FileContent["mail"]
+    & ".\TestOutput.ps1" -Source $FileContent["source"] -Module $FileContent["module"] -Action $FileContent["action"] -Mail $FileContent["mail"]
 }
 
 while($true){
    Start-Sleep -Seconds 1;
    Write-Host "watching folder..."
+   Receive-Job -Job $job
 }
